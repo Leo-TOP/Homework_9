@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, BookingStatusRequest} from '../models/booking'
+import type { Booking, BookingStatus, BookingStatusRequest } from '../models/booking'
 
 export class BookingCard extends HTMLElement {
   private current: Booking | null = null
@@ -7,6 +7,7 @@ export class BookingCard extends HTMLElement {
   private sourceText = document.createElement('p')
   private statusText = document.createElement('p')
   private button = document.createElement('button')
+  static observedAttributes = ['compact']
 
   constructor() {
     super()
@@ -16,14 +17,17 @@ export class BookingCard extends HTMLElement {
       article { border: 1px solid #c5d7d0; border-radius: 12px; padding: 16px; background: white; color: #203a34; }
       h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
       p { margin: 6px 0; }
-      button { background: #355bd4; color: white; border: 0; border-radius: 6px; padding: 9px 14px; font: inherit; cursor: pointer; }
+      button { background: var(--booking-accent, #355bd4); color: white; border: 0; border-radius: 6px; padding: 9px 14px; font: inherit; cursor: pointer; }
       button:disabled { background: #dfe6e3; color: #52665e; cursor: default; }
       button:focus-visible { outline: 3px solid #a15c00; outline-offset: 3px; }
     `
     const article = document.createElement('article')
+    const note = document.createElement('slot')
+    note.name = 'note'
+    note.textContent = 'Комментарий не задан'
     this.button.type = 'button'
-    article.append(this.nameText, this.seatsText, this.sourceText, this.statusText, this.button)
-    const root = this.attachShadow({mode: 'open'})
+    article.append(this.nameText, this.seatsText, this.sourceText, this.statusText, this.button, note)
+    const root = this.attachShadow({ mode: 'open' })
     root.append(article, style)
     this.render()
   }
@@ -35,6 +39,7 @@ export class BookingCard extends HTMLElement {
 
   private render() {
     const booking = this.current
+
     if (!booking) {
       this.nameText.textContent = 'Ожидаю данные'
       this.seatsText.textContent = ''
@@ -44,13 +49,20 @@ export class BookingCard extends HTMLElement {
       this.button.disabled = true
       return
     }
-    
-    this.seatsText.textContent = `Участников: ${String(booking.seats)}`
+
+    const isCompact = this.hasAttribute('compact')
+
+    this.seatsText.textContent = isCompact
+      ? `${booking.seats} чел.`
+      : `Участников: ${booking.seats}`
+
+    this.sourceText.hidden = isCompact
     this.sourceText.textContent = `Источник: ${booking.source}`
+
     this.nameText.textContent = booking.name
     this.button.disabled = false
 
-    if (booking.status === 'new'){
+    if (booking.status === 'new') {
       this.statusText.textContent = 'Новая заявка'
       this.button.textContent = 'Подтвердить'
     } else {
@@ -64,13 +76,13 @@ export class BookingCard extends HTMLElement {
     const nextStatus: BookingStatus = this.current.status === 'new' ? 'confirmed' : 'new'
 
     const request = new CustomEvent<BookingStatusRequest>
-      ('booking-status-request',  {
-      bubbles: true,
-      detail: {
-        id: this.current.id,
-        nextStatus: nextStatus
-      }
-    })
+      ('booking-status-request', {
+        bubbles: true,
+        detail: {
+          id: this.current.id,
+          nextStatus: nextStatus
+        }
+      })
 
     this.dispatchEvent(request)
   }
@@ -82,7 +94,10 @@ export class BookingCard extends HTMLElement {
   disconnectedCallback() {
     this.button.removeEventListener('click', this.onAction)
   }
+
+  attributeChangedCallback() {
+    this.render()
+  }
 }
 
 customElements.define('booking-card', BookingCard)
-// Д1: реакция на compact. Д2: слот note. Д3: сохранение узлов и тема.
